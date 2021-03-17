@@ -1,0 +1,28 @@
+---
+
+- hosts: all
+  become: true
+  tasks: 
+
+  - name: copy file 
+    copy:
+      src: /home/gcc/Documents/ansible/fedora_33_setup_script.sh
+      dest: /root/fedora_33_setup_script.sh
+      owner: root
+      group: root
+      mode: 0755
+  
+  - name: copy swtpm.sh
+    copy:
+      src: /home/gcc/Documents/ansible/swtpm_run.sh
+      dest: /root/swtpm_run.sh
+      owner: root
+      group: root
+      mode: 0755
+  
+  - name: Run a script with arguments
+    command: bash /root/fedora_33_setup_script.sh 
+
+
+   
+

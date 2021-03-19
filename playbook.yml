@@ -3,26 +3,93 @@
 - hosts: all
   become: true
   tasks: 
-
-  - name: copy file 
-    copy:
-      src: /home/gcc/Documents/ansible/fedora_33_setup_script.sh
-      dest: /root/fedora_33_setup_script.sh
-      owner: root
-      group: root
-      mode: 0755
   
-  - name: copy swtpm.sh
-    copy:
-      src: /home/gcc/Documents/ansible/swtpm_run.sh
-      dest: /root/swtpm_run.sh
-      owner: root
-      group: root
-      mode: 0755
-  
-  - name: Run a script with arguments
-    command: bash /root/fedora_33_setup_script.sh 
+    - name: install keylime dependencies 
+      tags: dependencies
+      dnf:
+        name:
+          - keylime
+          - wget
+          - gcc
+          - make
+          - openssl-devel
+          - vim
+          - iputils
+          - lsof
+        state: latest
+        update_cache: yes
+    
+    - name: install swtpm dependencies
+      tags: dependencies
+      dnf:
+        name: 
+          - dbus
+          - dbus-daemon
+          - dbus-devel
+          - swtpm
+          - swtpm-tools
+        state: latest
+        update_cache: yes
 
+    - name: copy swtpm script to remote nodes
+      tags: swtpm
+      copy:
+        src: /home/gcc/Documents/ansible/swtpm_run.sh
+        dest: /root/swtpm_run.sh
+        owner: root
+        group: root
+        mode: 0755
+    
+    - name: set require_ek_cert to false
+      tags: keylime_agent_config
+      lineinfile:
+        path: /etc/keylime.conf
+        regexp: '^require_ek_cert = *'
+        line: require_ek_cert = False
+        firstmatch: yes
+
+    - name: customize keylime registrar ip
+      tags: keylime_agent_config
+      lineinfile:
+        path: /etc/keylime.conf
+        regexp: '^registrar_ip = *'
+        line: registrar_ip = 172.100.1.8
+        firstmatch: yes
+
+    - name: set uuid to hostname
+      tags: keylime_agent_config
+      lineinfile:
+        path: /etc/keylime.conf
+        regexp: '^agent_uuid = *'
+        line: agent_uuid = {{ uuid }}
+        firstmatch: yes
+
+    - name: start swtpm
+      tags: start_services,start_swtpm
+      shell:
+        cmd: bash /root/swtpm_run.sh
+      async: 1000
+      poll: 0
+
+    - name: start keylime_agent
+      tags: start_services,start_keylime_agent
+      shell:
+        cmd: keylime_agent
+      async: 1000
+      poll: 0
+
+    - name: start IMA emulator
+      tags: start_services,start_ima_emulator
+      shell:
+        cmd: keylime_ima_emulator
+      async: 1000
+      poll: 0
+
+
+    - name: stop swtpm, tpm2-abrmd, and keylime_agent
+      tags: stop_all
+      shell: killall keylime_agent swtpm tpm2-abrmd --wait
+      ignore_errors: true
 
    
 
